@@ -4,6 +4,7 @@ import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
+import kotlin.experimental.xor
 
 fun main() {
     var input: String
@@ -27,9 +28,12 @@ fun show() {
     runCatching {
         println("Input image file:")
         val inputFile = File(readLine()!!)
+        println("Password:")
+        val password = readLine()!!
         val image = ImageIO.read(inputFile)
         val byteArray = findBitsInImage(image)
-        val decodedMessage = byteArray.toString(Charsets.UTF_8)
+        val decodedBytes = encryptDecryptMessageWithPassword(byteArray, password)
+        val decodedMessage = decodedBytes.toString(Charsets.UTF_8)
         println("Message:")
         println(decodedMessage)
     }.onFailure {
@@ -49,8 +53,9 @@ fun findBitsInImage(image: BufferedImage): ByteArray {
             if (bits.size == 8) {
                 val byte = bits.joinToString("").toUByte(radix = 2).toInt().toByte()
                 bytes.add(byte)
-                if (bytes.containsAll(endBytes)) {
-                    bytes.removeAll(endBytes)
+                getLast3Bytes(bytes)
+                if (getLast3Bytes(bytes) == endBytes) {
+                    repeat(endBytes.size) { bytes.removeLast() }
                     return bytes.toByteArray()
                 }
                 bits.clear()
@@ -58,6 +63,11 @@ fun findBitsInImage(image: BufferedImage): ByteArray {
         }
     }
     throw RuntimeException("Something is wrong")
+}
+
+fun getLast3Bytes(bytes: List<Byte>): List<Byte> {
+    if (bytes.size < 3) return emptyList()
+    return bytes.subList(bytes.size - 3, bytes.size)
 }
 
 fun hide() {
@@ -68,7 +78,10 @@ fun hide() {
         val outputFile = File(readLine()!!)
         println("Message to hide:")
         val message = readLine()!!
-        val byteArray = andEndingBytes(message.encodeToByteArray())
+        println("Password:")
+        val password = readLine()!!
+        val encodedMessage = encryptDecryptMessageWithPassword(message.encodeToByteArray(), password)
+        val byteArray = addEndingBytes(encodedMessage)
         val inputImage = ImageIO.read(inputFile)
         val outputImage = BufferedImage(inputImage.width, inputImage.height, BufferedImage.TYPE_INT_RGB)
         val totalBits = outputImage.width * outputImage.height
@@ -83,7 +96,17 @@ fun hide() {
     }
 }
 
-private fun andEndingBytes(byteArray: ByteArray): ByteArray {
+fun encryptDecryptMessageWithPassword(messageBytes: ByteArray, password: String): ByteArray {
+    val passwordBytes = password.encodeToByteArray()
+    val encryptedMessageArray = ByteArray(messageBytes.size)
+    for (i in messageBytes.indices) {
+        val passwordIndex = i % passwordBytes.size
+        encryptedMessageArray[i] = messageBytes[i] xor passwordBytes[passwordIndex]
+    }
+    return encryptedMessageArray
+}
+
+private fun addEndingBytes(byteArray: ByteArray): ByteArray {
     var byteArray1 = byteArray
     byteArray1 += 0
     byteArray1 += 0
@@ -100,7 +123,7 @@ fun setColorOfNewImage(original: BufferedImage, newImage: BufferedImage, byteArr
             if (traversedBits < allBits.size) {
                 val bit = allBits[traversedBits++]
                 val newBlue = color.blue.and(254).or(bit)
-                val newColor = Color(color.red,color.green,newBlue)
+                val newColor = Color(color.red, color.green, newBlue)
                 newImage.setRGB(x, y, newColor.rgb)
             } else {
                 newImage.setRGB(x, y, color.rgb)
