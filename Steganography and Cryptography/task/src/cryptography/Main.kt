@@ -3,7 +3,6 @@ package cryptography
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.File
-import java.security.MessageDigest
 import javax.imageio.ImageIO
 
 fun main() {
@@ -31,6 +30,7 @@ fun show() {
         val image = ImageIO.read(inputFile)
         val byteArray = findBitsInImage(image)
         val decodedMessage = byteArray.toString(Charsets.UTF_8)
+        println("Message:")
         println(decodedMessage)
     }.onFailure {
         println("Can't read input file!")
@@ -76,8 +76,6 @@ fun hide() {
         if (totalBits < storingBits) {
             return println("The input image is not large enough to hold this message.")
         }
-//        println("Input Image: ${getRelativePathUnix(inputFile)}")
-//        println("Output Image: ${getRelativePathUnix(outputFile)}")
         setColorOfNewImage(inputImage, outputImage, byteArray)
         saveImage(outputImage, outputFile)
     }.onFailure {
@@ -101,9 +99,9 @@ fun setColorOfNewImage(original: BufferedImage, newImage: BufferedImage, byteArr
             val color = Color(original.getRGB(x, y))
             if (traversedBits < allBits.size) {
                 val bit = allBits[traversedBits++]
-                val colorWithoutLastBit = color.rgb.toString(2).dropLast(1)
-                val newRgb = (colorWithoutLastBit + bit).toInt(2)
-                newImage.setRGB(x, y, newRgb)
+                val newBlue = color.blue.and(254).or(bit)
+                val newColor = Color(color.red,color.green,newBlue)
+                newImage.setRGB(x, y, newColor.rgb)
             } else {
                 newImage.setRGB(x, y, color.rgb)
             }
@@ -121,28 +119,8 @@ private fun getBits(byte: Byte): List<Int> {
 }
 
 fun saveImage(image: BufferedImage, file: File) {
-    println(imageHash(image))
     ImageIO.write(image, "png", file)
     println("Message saved in ${getRelativePathUnix(file)} image.")
-}
-
-private fun imageHash(inputImage: BufferedImage): String {
-    val imageByteArray = ByteArray(3 * inputImage.width * inputImage.height)
-    var index = 0
-    for (y in 0 until inputImage.height) {
-        for (x in 0 until inputImage.width) {
-            val color = Color(inputImage.getRGB(x, y))
-            imageByteArray[index] = color.red.toByte()
-            index++
-            imageByteArray[index] = color.green.toByte()
-            index++
-            imageByteArray[index] = color.blue.toByte()
-            index++
-        }
-    }
-    val md = MessageDigest.getInstance("SHA-1")
-    md.update(imageByteArray)
-    return md.digest().joinToString("") { "%02x".format(it) }
 }
 
 private fun getRelativePathUnix(currentFile: File) = currentFile.path.replace("\\", "/")
