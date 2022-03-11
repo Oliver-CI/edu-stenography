@@ -69,16 +69,17 @@ fun hide() {
         println("Message to hide:")
         val message = readLine()!!
         val byteArray = andEndingBytes(message.encodeToByteArray())
-        val image = ImageIO.read(inputFile)
-        val totalBits = image.width * image.height
+        val inputImage = ImageIO.read(inputFile)
+        val outputImage = BufferedImage(inputImage.width, inputImage.height, BufferedImage.TYPE_INT_RGB)
+        val totalBits = outputImage.width * outputImage.height
         val storingBits = byteArray.size * 8
         if (totalBits < storingBits) {
             return println("The input image is not large enough to hold this message.")
         }
 //        println("Input Image: ${getRelativePathUnix(inputFile)}")
 //        println("Output Image: ${getRelativePathUnix(outputFile)}")
-        changeColorOfImage(image, byteArray)
-        saveImage(image, outputFile)
+        setColorOfNewImage(inputImage, outputImage, byteArray)
+        saveImage(outputImage, outputFile)
     }.onFailure {
         println("Can't read input file!")
     }
@@ -92,17 +93,19 @@ private fun andEndingBytes(byteArray: ByteArray): ByteArray {
     return byteArray1
 }
 
-fun changeColorOfImage(image: BufferedImage, byteArray: ByteArray) {
+fun setColorOfNewImage(original: BufferedImage, newImage: BufferedImage, byteArray: ByteArray) {
     val allBits = byteArray.flatMap { getBits(it) }.toIntArray()
     var traversedBits = 0
-    for (y in 0 until image.height) {
-        for (x in 0 until image.width) {
-            if (allBits.size > traversedBits) {
+    for (y in 0 until newImage.height) {
+        for (x in 0 until newImage.width) {
+            val color = Color(original.getRGB(x, y))
+            if (traversedBits < allBits.size) {
                 val bit = allBits[traversedBits++]
-                val color = Color(image.getRGB(x, y))
                 val colorWithoutLastBit = color.rgb.toString(2).dropLast(1)
-                val newRgb = colorWithoutLastBit + bit
-                image.setRGB(x, y, newRgb.toInt(2))
+                val newRgb = (colorWithoutLastBit + bit).toInt(2)
+                newImage.setRGB(x, y, newRgb)
+            } else {
+                newImage.setRGB(x, y, color.rgb)
             }
         }
     }
@@ -112,7 +115,7 @@ private fun getBits(byte: Byte): List<Int> {
     val masterByte = byte.toInt()
     val bits = mutableListOf<Int>()
     for (i in 0..7) {
-        bits.add((masterByte shr i) and 1)
+        bits += (masterByte shr i) and 1
     }
     return bits.reversed()
 }
@@ -123,7 +126,7 @@ fun saveImage(image: BufferedImage, file: File) {
     println("Message saved in ${getRelativePathUnix(file)} image.")
 }
 
-private fun imageHash(inputImage: BufferedImage) : String {
+private fun imageHash(inputImage: BufferedImage): String {
     val imageByteArray = ByteArray(3 * inputImage.width * inputImage.height)
     var index = 0
     for (y in 0 until inputImage.height) {
